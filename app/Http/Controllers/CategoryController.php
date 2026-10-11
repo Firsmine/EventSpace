@@ -50,7 +50,7 @@ class CategoryController extends Controller
     public function show(Category $category)
     {
         return response()->json([
-            $category->loadCount('events');
+            $category->loadCount('events')
         ]);
     }
 
@@ -71,9 +71,9 @@ class CategoryController extends Controller
         $category->update($data);
 
         return response()->json([
-            'success'=>true,
-            'message'=>'Update category success',
-            'data'=>$category
+            'success' => true,
+            'message' => 'Update category success',
+            'data' => $category
         ]);
     }
 
@@ -82,29 +82,30 @@ class CategoryController extends Controller
      */
     public function destroy(Category $category)
     {
-        if ($category->events()->exists()){
+        if ($category->events()->exists()) {
             return response()->json([
-                'success'=>false,
-                'message'=>'Category is still used in an event'
+                'success' => false,
+                'message' => 'Category is still used in an event'
             ], 409);
         }
         $category->delete();
         return response()->json([
-            'success'=>true,
-            'message'=>'Delete category success'
+            'success' => true,
+            'message' => 'Delete category success'
         ]);
     }
 
-    public function events(Category $category){
+    public function events(Category $category)
+    {
         $events = $category->events()->where('status', 'published')
             ->with(['category', 'creator:id,name,username'])
             ->withCount('activeRegistration as participant_count')
             ->orderBy('event_date')->paginate(10);
 
         return response()->json([
-            'success'=>true,
-            'message'=>'Get all event based on category success',
-            'data'=>$events
+            'success' => true,
+            'message' => 'Get all event based on category success',
+            'data' => $events
         ]);
     }
 }
