@@ -136,4 +136,20 @@ class EventController extends Controller
             'message' => 'Delete event success'
         ]);
     }
+
+    public function updateStatus(Request $request, Event $event)
+    {
+        $this->ensureOwner($request, $event);
+        $data = $request->validate(['status' => 'required|in:draft,published,cancelled,finished']);
+        $event->update(['status' => $data['status']]);
+        return response()->json([
+            'success' => true,
+            'message' => "Update status success",
+            'data' => $event->refresh()
+        ]);
+    }
+    private function ensureOwner(Request $request, Event $event): void
+    {
+        abort_unless($request->user() && $request->user()->id === $event->user_id, 403, 'You do not have access to manage this event');
+    }
 }
