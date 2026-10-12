@@ -81,7 +81,7 @@ class EventController extends Controller
             'success' => true,
             'message' => 'Get event success',
             'data' => $event->load(['category', 'creator:id,name,username'])
-                ->loadCount('activeRegistrations as participants_count')
+                ->loadCount('activeRegistration as participants_count')
         ]);
     }
 

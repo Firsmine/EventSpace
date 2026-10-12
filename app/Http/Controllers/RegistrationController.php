@@ -22,7 +22,7 @@ class RegistrationController extends Controller
                     'message' => 'Registration unavailable'
                 ], 422);
             }
-            $registration = Registration::where(event_id, $lockedEvent->id)
+            $registration = Registration::where('event_id', $lockedEvent->id)
                 ->where('user_id', $user->id)
                 ->lockForUpdate()->first();
             if ($registration && $registration->status !== 'cancelled') {
@@ -31,7 +31,7 @@ class RegistrationController extends Controller
                     'message' => 'You can not register twice'
                 ], 409);
             }
-            $participantsCount = $lockedEvent->activeRegistrations()->count();
+            $participantsCount = $lockedEvent->activeRegistration()->count();
             if ($participantsCount >= $lockedEvent->capacity) {
                 return response()->json([
                     'success' => false,
@@ -71,7 +71,7 @@ class RegistrationController extends Controller
                 'message' => 'You have not registered',
             ]);
         }
-        $registration->update(['status' => 'cancelled']);
+        $registration->update(['status' => 'canceled']);
         return response()->json([
             'success' => true,
             'message' => 'Unregister success',
@@ -82,9 +82,9 @@ class RegistrationController extends Controller
     public function participants(Request $request, Event $event)
     {
         $this->ensureOwner($request, $event);
-        $participants = $event->activeRegistrations()
+        $participants = $event->activeRegistration()
             ->with('user:id,name,username')
-            ->orderBy('registered_at')
+            ->orderBy('created_at')
             ->paginate(20);
         return response()->json([
             'success' => true,
@@ -99,7 +99,7 @@ class RegistrationController extends Controller
             ->where('user_id', $request->user()->id)
             ->whereIn('status', ['registered', 'attended'])
             ->with(['event.category', 'event.creator:id,name,username'])
-            ->orderByDesc('registered_at')
+            ->orderByDesc('created_at')
             ->paginate(10);
 
         return response()->json([
@@ -114,7 +114,7 @@ class RegistrationController extends Controller
             ->where('event_id', $event->id)
             ->where('user_id', $request->user()->id)
             ->whereIn('status', ['registered', 'attended'])
-            ->exists();
+            ->first();
         return response()->json([
             'success' => true,
             'message' => 'Get status success',

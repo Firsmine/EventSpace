@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Psr\Http\Message\ResponseInterface;
 
 class CategoryController extends Controller
@@ -67,7 +68,7 @@ class CategoryController extends Controller
      */
     public function update(Request $request, Category $category)
     {
-        $data = $request->validate(['name' => 'required|string|max:100', Rule::unless('categories', 'name')->ignore($category->id)]);
+        $data = $request->validate(['name' => 'required|string|max:100', Rule::unique('categories', 'name')->ignore($category->id)]);
         $category->update($data);
 
         return response()->json([

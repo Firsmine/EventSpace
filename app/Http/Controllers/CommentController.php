@@ -17,7 +17,7 @@ class CommentController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Get all comments success',
-            'data' => $event->comments()->with('user:id,name,username')->latest()->pagination(20)
+            'data' => $event->comments()->with('user:id,name,username')->latest()->paginate(20)
         ]);
     }
 

@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use Dom\Comment;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Event extends Model
@@ -36,11 +36,11 @@ class Event extends Model
     {
         return $this->belongsTo(Category::class);
     }
-    public function registration()
+    public function registrations()
     {
         return $this->hasMany(Registration::class);
     }
-    public function activeRegistrations()
+    public function activeRegistration()
     {
         return $this->hasMany(Registration::class)->whereIn('status', ['registered', 'attended']);
     }
