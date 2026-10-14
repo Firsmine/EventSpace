@@ -69,7 +69,7 @@ class RegistrationController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'You have not registered',
-            ]);
+            ], 404);
         }
         $registration->update(['status' => 'canceled']);
         return response()->json([
@@ -81,7 +81,12 @@ class RegistrationController extends Controller
 
     public function participants(Request $request, Event $event)
     {
-        $this->ensureOwner($request, $event);
+        $owner = $this->ensureOwner($request, $event);
+        if (!$owner)
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have access'
+            ], 403);
         $participants = $event->activeRegistration()
             ->with('user:id,name,username')
             ->orderBy('created_at')
@@ -95,35 +100,68 @@ class RegistrationController extends Controller
 
     public function myEvents(Request $request)
     {
-        $registrations = Registration::query()
-            ->where('user_id', $request->user()->id)
-            ->whereIn('status', ['registered', 'attended'])
-            ->with(['event.category', 'event.creator:id,name,username'])
-            ->orderByDesc('created_at')
-            ->paginate(10);
+        try {
+            $registrations = Registration::query()
+                ->where('user_id', $request->user()->id)
+                ->whereIn('status', ['registered', 'attended'])
+                ->with(['event.category', 'event.creator:id,name,username'])
+                ->orderByDesc('created_at')
+                ->paginate(10);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Get registration success',
-            'data' => $registrations
-        ]);
+            if ($registrations->isEmpty())
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You have not registered for any events'
+                ], 404);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Get registration success',
+                'data' => $registrations
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get your events.',
+            ], 500);
+        }
     }
     public function status(Request $request, Event $event)
     {
-        $registered = Registration::query()
-            ->where('event_id', $event->id)
-            ->where('user_id', $request->user()->id)
-            ->whereIn('status', ['registered', 'attended'])
-            ->first();
-        return response()->json([
-            'success' => true,
-            'message' => 'Get status success',
-            'data' => $registered
-        ]);
+        try {
+            $registered = Registration::query()
+                ->where('event_id', $event->id)
+                ->where('user_id', $request->user()->id)
+                ->whereIn('status', ['registered', 'attended'])
+                ->first();
+            if (!$registered) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'You are not registered for this event.',
+                ], 200);
+            }
+            return response()->json([
+                'success' => true,
+                'message' => 'Get status success',
+                'data' => $registered
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get registration status',
+            ], 500);
+        }
     }
 
-    private function ensureOwner(Request $request, Event $event): void
+    // private function ensureOwner(Request $request, Event $event): void
+    // {
+    //     abort_unless($request->user()->id === $event->user_id, 403, 'You do not have access');
+    // }
+
+    private function ensureOwner(Request $request, Event $event): bool
     {
-        abort_unless($request->user()->id === $event->user_id, 403, 'You do not have access');
+        return $request->user()->id === $event->created_by;
     }
 }

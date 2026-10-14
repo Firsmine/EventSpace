@@ -42,7 +42,7 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            return response->json([
+            return response()->json([
                 'success' => false,
                 'message' => 'Login failed. Email or password may be wrong',
             ]);
@@ -69,10 +69,12 @@ class AuthController extends Controller
 
     public function profile(Request $request)
     {
+        $user = $request->user();
+
         return response()->json([
             'success' => true,
             'message' => 'show data profile success',
-            'data' => $request->user()
+            'data' => $user
         ]);
     }
 }

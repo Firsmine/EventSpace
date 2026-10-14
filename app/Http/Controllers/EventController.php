@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Event;
 use DB;
 use Illuminate\Http\Request;
+use League\Config\Exception\ValidationException;
+use Throwable;
 
 class EventController extends Controller
 {
@@ -53,20 +55,34 @@ class EventController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'category_id' => 'required|integer|exists:categories,id',
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'location' => 'required|string|max:255',
-            'event_date' => 'required|date',
-            'capacity' => 'required|integer|min:1'
-        ]);
-        $event = $request->user()->events()->create($data);
-        return response()->json([
-            'success' => true,
-            'message' => 'Create event success',
-            'data' => $event->load(['category', 'creator:id,name,username'])
-        ]);
+        try {
+            $data = $request->validate([
+                'category_id' => 'required|integer|exists:categories,id',
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'location' => 'required|string|max:255',
+                'event_date' => 'required|date',
+                'capacity' => 'required|integer|min:1'
+            ]);
+            $event = $request->user()->events()->create($data);
+            return response()->json([
+                'success' => true,
+                'message' => 'Create event success',
+                'data' => $event->load(['category', 'creator:id,name,username'])
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Throwable $e) {
+            report($e);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create event.',
+            ], 500);
+        }
     }
 
     /**
@@ -98,30 +114,45 @@ class EventController extends Controller
      */
     public function update(Request $request, Event $event)
     {
-        $this->ensureOwner($request, $event);
-        $data = $request->validate([
-            'category_id' => 'required|integer|exists:categories,id',
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'location' => 'required|string|max:255',
-            'event_date' => 'required|date',
-            'capacity' => 'required|integer|min:1'
-        ]);
-        if (isset($data['capacity'])) {
-            $activeCount = $event->activeRegistrations()->count();
-            if ($data['capacity'] < $activeCount) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Capacity cannot be less than the active participants ({$activeCount})',
-                ], 422);
+        try {
+
+            $this->ensureOwner($request, $event);
+            $data = $request->validate([
+                'category_id' => 'required|integer|exists:categories,id',
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'location' => 'required|string|max:255',
+                'event_date' => 'required|date',
+                'capacity' => 'required|integer|min:1'
+            ]);
+            if (isset($data['capacity'])) {
+                $activeCount = $event->activeRegistration()->count();
+                if ($data['capacity'] < $activeCount) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Capacity cannot be less than the active participants ({$activeCount})',
+                    ], 422);
+                }
             }
+            $event->update($data);
+            return response()->json([
+                'success' => true,
+                'message' => 'Update event success',
+                'data' => $event->refresh()->load(['category', 'creator:id,name,username'])
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Throwable $e) {
+            report($e);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update event.',
+            ], 500);
         }
-        $event->update($data);
-        return response()->json([
-            'success' => true,
-            'message' => 'Update event success',
-            'data' => $event->refresh()->load(['category', 'creator:id,name,username'])
-        ]);
     }
 
     /**
@@ -139,14 +170,28 @@ class EventController extends Controller
 
     public function updateStatus(Request $request, Event $event)
     {
-        $this->ensureOwner($request, $event);
-        $data = $request->validate(['status' => 'required|in:draft,published,cancelled,finished']);
-        $event->update(['status' => $data['status']]);
-        return response()->json([
-            'success' => true,
-            'message' => "Update status success",
-            'data' => $event->refresh()
-        ]);
+        try {
+            $this->ensureOwner($request, $event);
+            $data = $request->validate(['status' => 'required|in:draft,published,cancelled,finished']);
+            $event->update(['status' => $data['status']]);
+            return response()->json([
+                'success' => true,
+                'message' => "Update status success",
+                'data' => $event->refresh()
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Throwable $e) {
+            report($e);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update status.',
+            ], 500);
+        }
     }
     private function ensureOwner(Request $request, Event $event): void
     {

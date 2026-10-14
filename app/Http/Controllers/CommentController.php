@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Comment;
 use App\Models\Event;
 use Illuminate\Http\Request;
+use League\Config\Exception\ValidationException;
+use Throwable;
 
 class CommentController extends Controller
 {
@@ -34,19 +36,27 @@ class CommentController extends Controller
      */
     public function store(Request $request, Event $event)
     {
-        $this->ensureCanView($request, $event);
-        $data = $request->validate([
-            'comment' => 'required|string|max:5000'
-        ]);
-        $comment = $event->comments()->create([
-            'user_id' => $request->user()->id,
-            'comment' => $data['comment']
-        ]);
-        return response()->json([
-            'success' => true,
-            'message' => 'Create comment success',
-            'data' => $comment->load('user:id,name,username')
-        ], 201);
+        try {
+            $this->ensureCanView($request, $event);
+            $data = $request->validate([
+                'comment' => 'required|string|max:5000'
+            ]);
+            $comment = $event->comments()->create([
+                'user_id' => $request->user()->id,
+                'comment' => $data['comment']
+            ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Create comment success',
+                'data' => $comment->load('user:id,name,username')
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
     }
 
     /**
@@ -70,14 +80,28 @@ class CommentController extends Controller
      */
     public function update(Request $request, Comment $comment)
     {
-        $this->ensureCommentOwner($request, $comment);
-        $data = $request->validate(['comment' => 'required|string|max:5000']);
-        $comment->update($data);
-        return response()->json([
-            'success' => true,
-            'message' => 'Update comment success',
-            'data' => $comment->refresh()->load('user:id,name,username')
-        ]);
+        try {
+            $this->ensureCommentOwner($request, $comment);
+            $data = $request->validate(['comment' => 'required|string|max:5000']);
+            $comment->update($data);
+            return response()->json([
+                'success' => true,
+                'message' => 'Update comment success',
+                'data' => $comment->refresh()->load('user:id,name,username')
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Throwable $e) {
+            report($e);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update comment.',
+            ], 500);
+        }
     }
 
     /**
@@ -85,12 +109,20 @@ class CommentController extends Controller
      */
     public function destroy(Request $request, Comment $comment)
     {
-        $this->ensureCommentOwner($request, $comment);
-        $comment->delete();
-        return response()->json([
-            'success' => true,
-            'message' => 'Delete comment success'
-        ]);
+        try {
+            $this->ensureCommentOwner($request, $comment);
+            $comment->delete();
+            return response()->json([
+                'success' => true,
+                'message' => 'Delete comment success'
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete comment.',
+            ], 500);
+        }
     }
 
     private function ensureCommentOwner(Request $request, Comment $comment): void
